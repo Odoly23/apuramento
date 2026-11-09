@@ -422,3 +422,64 @@ class OnceEditTests(Base):
         # halaman seluk mantein sidebar
         self.login(self.mon)
         self.assertIn('id="side"', self.client.get(reverse("compare")).content.decode())
+
+
+class ImportTests(Base):
+    CSV = ("code,name,voters,municipality,post,village,aldeia,nasaun\n"
+           "AA-1,Eskola A,500,Baucau,Posto B,Suku C,Aldeia D,\n"
+           "AA-2,Eskola B,300,Baucau,Posto B,suku c,,\n"
+           "DP-9,Sentru Sydney,900,,,,,Austrália\n")
+
+    def test_dry_run_changes_nothing_then_apply(self):
+        from .importers import import_centres
+        before = Centre.objects.count()
+        r = import_centres(self.CSV)
+        self.assertEqual((r["errors"], r["new"]["centre"], r["applied"]), ([], 3, False))
+        self.assertEqual(Centre.objects.count(), before)
+        r = import_centres(self.CSV, apply=True)
+        self.assertTrue(r["applied"])
+        self.assertEqual(Centre.objects.count(), before + 3)
+        self.assertEqual(Village.objects.filter(name__iexact="suku c").count(), 1)  # la duplika
+        self.assertTrue(Centre.objects.get(code="DP-9").is_diaspora)
+        again = import_centres(self.CSV, apply=True)  # idempotente
+        self.assertEqual((again["new"]["centre"], again["unchanged"]), (0, 3))
+
+    def test_errors_block_everything(self):
+        from .importers import import_centres
+        bad = self.CSV + "AA-1,Dup,1,Baucau,P,S,,\nXX-1,Sala,abc,Baucau,P,S,,\nXX-2,Sala2,5,,,,,\nXX-3,Duplu,5,Dili,P,S,,Portugal\n"
+        r = import_centres(bad, apply=True)
+        self.assertEqual(len(r["errors"]), 4)
+        self.assertFalse(r["applied"])
+        self.assertFalse(Centre.objects.filter(code="AA-1").exists())
+
+    def test_cannot_change_centre_with_reports(self):
+        from .importers import import_centres
+        self.post(self.f1, self.c1, 10, 10)
+        r = import_centres("code,name,voters,municipality,post,village\nDL-1,C1,999,Dili,P1,S1\n", apply=True)
+        self.assertEqual(len(r["errors"]), 1)
+        r = import_centres("code,name,voters,municipality,post,village\nDL-1,Naran Foun,1000,Dili,P1,S1\n", apply=True)
+        self.assertTrue(r["applied"])
+        self.c1.refresh_from_db()
+        self.assertEqual(self.c1.name, "Naran Foun")
+
+    def test_alias_headers_semicolon_and_bom(self):
+        from .importers import import_centres, decode
+        raw = "\ufeffkodigu;naran;eleitor;munisipiu;postu;suku\nZ-1;Sentru;100;Aileu;P;S\n".encode("utf-8")
+        r = import_centres(decode(raw), apply=True)
+        self.assertEqual((r["errors"], r["new"]["centre"]), ([], 1))
+
+    def test_view_access_and_flow(self):
+        self.login(self.mon)
+        self.assertEqual(self.client.get(reverse("import_centres")).status_code, 403)
+        self.login(self.admin)
+        self.assertContains(self.client.get(reverse("import_template")), "DP-0001")
+        up = SimpleUploadedFile("c.csv", self.CSV.encode(), content_type="text/csv")
+        r = self.client.post(reverse("import_centres"), {"action": "check", "file": up})
+        self.assertContains(r, "AA-1")
+        tok = r.context["token"]
+        self.assertFalse(Centre.objects.filter(code="AA-1").exists())
+        self.client.post(reverse("import_centres"), {"action": "apply", "token": tok})
+        self.assertTrue(Centre.objects.filter(code="AA-1").exists())
+        r = self.client.post(reverse("import_centres"), {"action": "apply", "token": tok})  # token uza ona
+        self.assertEqual(r.status_code, 302)
+        self.assertTrue(AuditLog.objects.filter(action="import_apply").exists())

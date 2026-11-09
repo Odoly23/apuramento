@@ -17,7 +17,7 @@ python manage.py runserver
 Tama iha http://localhost:8000 ho: `admin` / `verifikador` (verifikadór), `mdi` (monitór), `pau_nain` (nain-partidu),
 `fiskal_dl_1` (fiskál Dili) — password hanesan ne'ebé ita define.
 
-Teste: `python manage.py test` (37 teste).
+Teste: `python manage.py test` (42 teste).
 
 ## Papél
 | Papél | Bele halo |
@@ -61,6 +61,16 @@ Teste: `python manage.py test` (37 teste).
 - **Fiskál** tama → direta ba form sentru ne'ebé seidauk hatama dadus. Hatama **dala ida**, edita **dala ida de'it**
   (`MAX_EDITS=1` iha settings), depois ne'e bloke. Se verifikadór *rejeita*, fiskál bele korrije fali. Konfirmasaun
   molok haruka; kompletu hotu → lista sentru.
+
+## Impor sentru husi CSV
+Menu **Impor sentru (CSV)** (`/import/`, admin de'it) ka `python manage.py import_centres file.csv [--apply]`.
+- Kolona obrigatóriu: `code, name, voters`. Timor: `municipality, post, village` (+ `aldeia` opsionál, `municipality_code`,
+  `hckey`). Diáspora: `nasaun`. Alias Tetun/PT/ID aseita (ez. `kodigu, naran, eleitor, munisipiu, postu, suku`);
+  delimitadór `,` `;` tab; UTF-8 (BOM OK). Download modelu iha pájina.
+- **Validasaun molok grava** (pratinjau): se iha error ida, **la grava buat ida** (atomik). Kódigu duplikadu, eleitór la
+  válidu, nasaun + munisípiu hamutuk, maks 20.000 linha / 3 MB.
+- Idempotente: kódigu hanesan = atualiza; munisípiu/postu/suku/aldeia/nasaun foun kria automátiku (la duplika, la sensitivu
+  ba letra boot/kiik). Sentru ne'ebé iha relatóriu ona **la bele muda fatin/eleitór**. Audit log rejistu kada impor.
 
 ## Produksaun
 Define environment: `DJANGO_DEBUG=False`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`,

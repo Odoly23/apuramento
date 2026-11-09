@@ -1,5 +1,6 @@
 import csv
 import json
+import secrets
 from functools import wraps
 
 from django.conf import settings
@@ -15,9 +16,10 @@ from django.views.decorators.http import require_POST
 
 from . import chatbot
 from .auth_utils import c_user_fun
+from . import importers
 from .forms import ReportForm
 from .i18n import LANGS, all_for, tr
-from .models import AuditLog, Centre, Contestant, Evidence, Profile, Report, ResultLine, client_ip
+from .models import Election, AuditLog, Centre, Contestant, Evidence, Profile, Report, ResultLine, client_ip
 from .services import (build_snapshot, compute_flags, consolidate, invalidate, pick_election,
                        resolve_centre)
 
@@ -415,3 +417,50 @@ def chat_api(request):
 @login_required
 def i18n_js(request):
     return JsonResponse(all_for(request.lang))
+
+
+# ---------------------------------------------------------------- impor CSV sentru
+@role_view("admin")
+def import_centres_view(request):
+    ctx = {"page": "import", "report": None, "token": ""}
+    if request.method == "POST":
+        action = request.POST.get("action")
+        key = None
+        if action == "check":
+            f = request.FILES.get("file")
+            if not f or f.size > importers.MAX_BYTES:
+                messages.error(request, tr("import_bad_file", request.lang))
+                return redirect("import_centres")
+            try:
+                text = importers.decode(f.read())
+            except ValueError:
+                messages.error(request, tr("import_bad_file", request.lang))
+                return redirect("import_centres")
+            rep = importers.import_centres(text, apply=False)
+            token = secrets.token_urlsafe(16)
+            cache.set(f"imp:{request.user.id}:{token}", text, 900)
+            ctx.update(report=rep, token=token, filename=f.name[:80])
+            AuditLog.record(request, "import_check", target=f.name[:80], rows=rep["rows"], errors=len(rep["errors"]))
+        elif action == "apply":
+            token = request.POST.get("token", "")
+            key = f"imp:{request.user.id}:{token}"
+            text = cache.get(key)
+            if not text:
+                messages.error(request, tr("import_expired", request.lang))
+                return redirect("import_centres")
+            rep = importers.import_centres(text, apply=True)
+            cache.delete(key)
+            if rep["applied"]:
+                for el in Election.objects.all():
+                    invalidate(el.id)
+                AuditLog.record(request, "import_apply", rows=rep["rows"], new=rep["new"], updated=rep["updated"])
+                messages.success(request, tr("import_done", request.lang))
+            ctx.update(report=rep, applied=rep["applied"])
+    return render(request, "import_centres.html", ctx)
+
+
+@role_view("admin")
+def import_template(request):
+    resp = HttpResponse(importers.TEMPLATE, content_type="text/csv; charset=utf-8")
+    resp["Content-Disposition"] = 'attachment; filename="modelu_sentru.csv"'
+    return resp
