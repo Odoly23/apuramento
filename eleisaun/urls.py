@@ -12,6 +12,7 @@ urlpatterns = [
     path("api/live/", views.api_live, name="api_live"),
     path("export/<str:level>.csv", views.export_csv, name="export_csv"),
     path("fiskal/", views.fiskal_home, name="fiskal_home"),
+    path("fiskal/lista/", views.fiskal_list, name="fiskal_list"),
     path("fiskal/sentru/<int:centre_id>/", views.submit_report, name="submit_report"),
     path("relatoriu/<int:pk>/", views.report_detail, name="report_detail"),
     path("relatoriu/<int:pk>/review/", views.report_review, name="report_review"),

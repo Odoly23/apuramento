@@ -363,7 +363,7 @@ class DiasporaAndHelperTests(Base):
         self.assertIn("Portugal", chatbot.answer("resultados Portugal", "pt", self.mon.profile, self.el))
         self.assertIn("Diáspora", chatbot.answer("diaspora", "pt", self.mon.profile, self.el))
         self.login(f)
-        self.assertEqual(self.client.get(reverse("fiskal_home")).status_code, 200)
+        self.assertEqual(self.client.get(reverse("fiskal_list")).status_code, 200)
         self.assertIn("Diáspora", self.c3.location)
 
     def test_geojson_served_and_matches_hckeys(self):
@@ -375,3 +375,50 @@ class DiasporaAndHelperTests(Base):
         self.login(self.mon)
         html = self.client.get(reverse("dashboard")).content.decode()
         self.assertIn("geo/tl-all.geo.json", html)
+
+
+class OnceEditTests(Base):
+    def test_login_redirects_to_form_then_list(self):
+        self.login(self.f1)
+        r = self.client.get(reverse("fiskal_home"))
+        self.assertRedirects(r, reverse("submit_report", args=[self.c1.id]), fetch_redirect_response=False)
+        self.post(self.f1, self.c1, 10, 10)
+        r = self.client.get(reverse("fiskal_home"))  # sentru 2 seidauk
+        self.assertRedirects(r, reverse("submit_report", args=[self.c2.id]), fetch_redirect_response=False)
+        self.post(self.f1, self.c2, 5, 5)
+        self.assertRedirects(self.client.get(reverse("fiskal_home")), reverse("fiskal_list"), fetch_redirect_response=False)
+
+    def test_input_once_edit_once(self):
+        self.post(self.f1, self.c1, 10, 10)
+        self.post(self.f1, self.c1, 20, 20, photo=False)  # edit #1 OK
+        rep = Report.objects.get()
+        self.assertEqual((rep.voted, rep.version), (40, 2))
+        self.post(self.f1, self.c1, 30, 30, photo=False)  # edit #2 BLOKE
+        rep.refresh_from_db()
+        self.assertEqual((rep.voted, rep.version), (40, 2))
+        r = self.client.get(reverse("submit_report", args=[self.c1.id]))
+        self.assertTrue(r.context["locked"])
+        self.assertContains(r, "once locked")
+
+    def test_rejected_can_be_corrected(self):
+        self.post(self.f1, self.c1, 10, 10)
+        self.post(self.f1, self.c1, 11, 11, photo=False)
+        rep = Report.objects.get()
+        self.login(self.admin)
+        self.client.post(reverse("report_review", args=[rep.id]), {"action": "reject", "note": "foto la klaru"})
+        self.post(self.f1, self.c1, 12, 12, photo=False)
+        rep.refresh_from_db()
+        self.assertEqual((rep.voted, rep.status), (24, Report.PENDING))
+
+    def test_dashboard_is_sidebar_free_fullscreen(self):
+        self.login(self.mon)
+        html = self.client.get(reverse("dashboard")).content.decode()
+        self.assertIn('class="shell focus"', html)
+        self.assertNotIn('id="side"', html)
+        self.assertIn('id="fsBtn"', html)
+        self.login(self.f1)
+        html = self.client.get(reverse("submit_report", args=[self.c1.id])).content.decode()
+        self.assertNotIn('id="side"', html)
+        # halaman seluk mantein sidebar
+        self.login(self.mon)
+        self.assertIn('id="side"', self.client.get(reverse("compare")).content.decode())

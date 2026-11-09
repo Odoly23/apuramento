@@ -1,0 +1,14 @@
+{% load ui %}
+      {% if profile.can_monitor %}
+        <a href="{% url 'dashboard' %}" class="{% if page == 'dashboard' %}active{% endif %}"><span class="ic">📊</span>{% t 'dashboard' %}</a>
+        <a href="{% url 'compare' %}" class="{% if page == 'compare' %}active{% endif %}"><span class="ic">⚖️</span>{% t 'compare' %}</a>
+      {% endif %}
+      {% if profile.is_fiskal %}
+        <a href="{% url 'fiskal_list' %}" class="{% if page == 'fiskal' %}active{% endif %}"><span class="ic">📝</span>{% t 'my_centres' %}</a>
+      {% endif %}
+      {% if profile.is_admin %}
+        <a href="{% url 'verification' %}" class="{% if page == 'verification' %}active{% endif %}"><span class="ic">✅</span>{% t 'verification' %}</a>
+        <a href="{% url 'audit' %}" class="{% if page == 'audit' %}active{% endif %}"><span class="ic">🔒</span>{% t 'audit' %}</a>
+      {% endif %}
+      <a href="{% url 'twofa_setup' %}" class="{% if page == '2fa' %}active{% endif %}"><span class="ic">🔐</span>{% t 'security_menu' %}</a>
+      {% if user.is_staff %}<a href="{% url 'admin:index' %}"><span class="ic">⚙️</span>Admin</a>{% endif %}

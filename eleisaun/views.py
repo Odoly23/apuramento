@@ -124,7 +124,7 @@ def home(request):
 def dashboard(request):
     snap = _snapshot_for_page(request.election) if request.election else None
     return render(request, "dashboard.html", {
-        "snap": snap, "page": "dashboard", "my_party": request.user.profile.party_id,
+        "snap": snap, "page": "dashboard", "focus": True, "my_party": request.user.profile.party_id,
     })
 
 
@@ -184,10 +184,33 @@ def export_csv(request, level):
 
 
 # ---------------------------------------------------------------- fiskál
+def _fiskal_centres(request):
+    return list(request.user.profile.centres.select_related("village__administrativepost__municipality", "nasaun")
+                .order_by("code"))
+
+
+def _needs_input(report):
+    """Sentru seidauk iha relatóriu ka relatóriu rejeitadu -> presiza hatama."""
+    return report is None or report.status == Report.REJECTED
+
+
 @role_view("fiskal")
 def fiskal_home(request):
+    """Fiskál tama -> direta ba form sentru ne'ebé seidauk hatama dadus; se kompletu, ba lista."""
     e = request.election
-    centres = list(request.user.profile.centres.select_related("village__administrativepost__municipality", "nasaun"))
+    if e and e.is_active:
+        centres = _fiskal_centres(request)
+        mine = {r.centre_id: r for r in Report.objects.filter(election=e, submitted_by=request.user)}
+        for c in centres:
+            if _needs_input(mine.get(c.id)):
+                return redirect("submit_report", centre_id=c.id)
+    return redirect("fiskal_list")
+
+
+@role_view("fiskal")
+def fiskal_list(request):
+    e = request.election
+    centres = _fiskal_centres(request)
     rows = []
     if e:
         reps = {}
@@ -198,12 +221,22 @@ def fiskal_home(request):
         for c in centres:
             own = mine.get(c.id)
             state = resolve_centre(reps[c.id])[1] if c.id in reps else None
-            rows.append({"centre": c, "own": own, "state": state})
+            rows.append({"centre": c, "own": own, "state": state,
+                         "can_edit": bool(own) and _can_edit(own, e)})
     done = sum(1 for r in rows if r["own"] and r["own"].status != Report.REJECTED)
     return render(request, "fiskal_home.html", {
-        "rows": rows, "done": done, "total": len(rows), "page": "fiskal",
+        "rows": rows, "done": done, "total": len(rows), "page": "fiskal", "focus": True,
         "pct": round(100 * done / len(rows)) if rows else 0,
     })
+
+
+def _can_edit(report, election):
+    """Hatama dala ida, edita dala ida (MAX_EDITS). Rejeitadu husi verifikadór -> bele korrije fali."""
+    if not election.is_active or report.status == Report.VERIFIED:
+        return False
+    if report.status == Report.REJECTED:
+        return True
+    return report.version - 1 < settings.MAX_EDITS
 
 
 @role_view("fiskal")
@@ -214,7 +247,9 @@ def submit_report(request, centre_id):
         return render(request, "403.html", status=403)
     contestants = list(Contestant.objects.filter(election=e).select_related("party"))
     existing = Report.objects.filter(election=e, centre=centre, submitted_by=request.user).first()
-    locked = bool(existing and existing.status == Report.VERIFIED) or not e.is_active
+    locked = not e.is_active or (existing is not None and not _can_edit(existing, e))
+    edits_left = max(0, settings.MAX_EDITS - (existing.version - 1)) if existing and existing.status == Report.PENDING else (
+        settings.MAX_EDITS if existing is None else 0)
 
     initial = {}
     if existing:
@@ -258,7 +293,8 @@ def submit_report(request, centre_id):
         form = ReportForm(initial=initial, contestants=contestants, centre=centre, lang=request.lang)
 
     return render(request, "submit.html", {
-        "form": form, "centre": centre, "report": existing, "locked": locked, "page": "fiskal",
+        "form": form, "centre": centre, "report": existing, "locked": locked, "page": "fiskal", "focus": True,
+        "edits_left": edits_left, "max_edits": settings.MAX_EDITS,
         "contestants": [(c, form[f"c_{c.id}"]) for c in contestants],
     })
 

@@ -10,6 +10,11 @@ def t(context, key):
     return tr(key, context.get("lang", "tet"))
 
 
+@register.simple_tag(takes_context=True)
+def tn(context, key, n):
+    return tr(key, context.get("lang", "tet")).replace("%(n)s", str(n))
+
+
 @register.filter
 def fmt(value):
     try:

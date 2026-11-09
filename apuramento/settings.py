@@ -118,6 +118,8 @@ X_FRAME_OPTIONS = "DENY"
 # --- Upload prova foto -------------------------------------------------------
 MAX_EVIDENCE_BYTES = 8 * 1024 * 1024
 MAX_EVIDENCE_FILES = 6
+# Fiskál hatama dala ida, bele edita dala ida de'it (depois ne'e bloke)
+MAX_EDITS = 1
 DATA_UPLOAD_MAX_MEMORY_SIZE = 60 * 1024 * 1024
 FILE_UPLOAD_PERMISSIONS = 0o640
 

@@ -8,6 +8,7 @@
   <div class="value">{{ done }} / {{ total }}</div>
   <div class="bar"><i style="width:{{ pct }}%"></i></div>
 </div>
+{% if rows and done == total %}<div class="once done">{% t 'all_done' %}</div>{% endif %}
 {% if not rows %}<div class="card">{% t 'assigned_none' %}</div>{% endif %}
 <div class="grid g2">
   {% for r in rows %}
@@ -22,7 +23,9 @@
     {% if r.state == 'conflict' %}<p class="badge bad" style="margin-top:10px">⚠ {% t 'flag_conflict' %}</p>{% endif %}
     {% if r.own and r.own.status == 'rejected' and r.own.review_note %}<p class="small" style="color:var(--bad)">{% t 'reason' %}: {{ r.own.review_note }}</p>{% endif %}
     <div style="margin-top:12px;display:flex;gap:8px">
-      <a class="btn primary" href="{% url 'submit_report' r.centre.id %}">{% if r.own %}{% t 'update_results' %}{% else %}{% t 'submit_results' %}{% endif %}</a>
+      {% if not r.own %}<a class="btn primary" href="{% url 'submit_report' r.centre.id %}">{% t 'submit_results' %}</a>
+      {% elif r.can_edit %}<a class="btn primary" href="{% url 'submit_report' r.centre.id %}">{% t 'update_results' %}</a>
+      {% else %}<span class="badge muted">🔒</span>{% endif %}
       {% if r.own %}<a class="btn" href="{% url 'report_detail' r.own.id %}">{% t 'view' %}</a>{% endif %}
     </div>
   </div>

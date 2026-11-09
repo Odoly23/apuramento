@@ -17,7 +17,7 @@ python manage.py runserver
 Tama iha http://localhost:8000 ho: `admin` / `verifikador` (verifikadór), `mdi` (monitór), `pau_nain` (nain-partidu),
 `fiskal_dl_1` (fiskál Dili) — password hanesan ne'ebé ita define.
 
-Teste: `python manage.py test` (33 teste).
+Teste: `python manage.py test` (37 teste).
 
 ## Papél
 | Papél | Bele halo |
@@ -55,6 +55,12 @@ Teste: `python manage.py test` (33 teste).
   tile iha painel, hatama iha total nasionál).
 - **Helper** `eleisaun/auth_utils.py`: `c_user_fun(user)` (perfíl/fiskál, fila `""` se la iha), `c_user_party(user)`,
   `c_party_users(party)`, `c_party_centres(party)`. Papél sinkroniza ba Django `Group` (admin/fiskal/monitor).
+
+## Mode fokus no input dala ida
+- **Painel diretu** la iha sidebar: tela tomak (botaun ⛶ fullscreen), de'it menu kompaktu iha leten.
+- **Fiskál** tama → direta ba form sentru ne'ebé seidauk hatama dadus. Hatama **dala ida**, edita **dala ida de'it**
+  (`MAX_EDITS=1` iha settings), depois ne'e bloke. Se verifikadór *rejeita*, fiskál bele korrije fali. Konfirmasaun
+  molok haruka; kompletu hotu → lista sentru.
 
 ## Produksaun
 Define environment: `DJANGO_DEBUG=False`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`,

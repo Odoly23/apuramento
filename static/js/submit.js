@@ -24,7 +24,8 @@
       img.onload = function () { URL.revokeObjectURL(img.src); }; prev.appendChild(img);
     });
   });
-  form.addEventListener("submit", function () {
+  form.addEventListener("submit", function (e) {
+    if (!window.confirm(T.confirm_submit)) { e.preventDefault(); return; }
     var b = form.querySelector('button[type="submit"]'); if (b) { setTimeout(function () { b.disabled = true; }, 0); }
   });
 })();

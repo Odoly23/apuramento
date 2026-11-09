@@ -18,6 +18,11 @@
     document.documentElement.setAttribute("data-theme", cur);
     try { localStorage.setItem("theme", cur); } catch (e) {}
   });
+  var fs = $("#fsBtn");
+  if (fs) fs.addEventListener("click", function () {
+    if (document.fullscreenElement) document.exitFullscreen();
+    else if (document.documentElement.requestFullscreen) document.documentElement.requestFullscreen();
+  });
   var mb = $("#menuBtn");
   if (mb) mb.addEventListener("click", function () { $("#side").classList.toggle("open"); });
   document.querySelectorAll("[data-autosubmit]").forEach(function (s) {
