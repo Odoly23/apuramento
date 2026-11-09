@@ -25,6 +25,7 @@
         <a href="{% url 'verification' %}" class="{% if page == 'verification' %}active{% endif %}"><span class="ic">✅</span>{% t 'verification' %}</a>
         <a href="{% url 'audit' %}" class="{% if page == 'audit' %}active{% endif %}"><span class="ic">🔒</span>{% t 'audit' %}</a>
       {% endif %}
+      <a href="{% url 'twofa_setup' %}" class="{% if page == '2fa' %}active{% endif %}"><span class="ic">🔐</span>{% t 'security_menu' %}</a>
       {% if user.is_staff %}<a href="{% url 'admin:index' %}"><span class="ic">⚙️</span>Admin</a>{% endif %}
     </nav>
     <div class="side-foot">

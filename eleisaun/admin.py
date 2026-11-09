@@ -1,7 +1,7 @@
 from django.contrib import admin
 
-from .models import (AuditLog, Centre, Contestant, Election, Evidence, Municipality, Party, Postu, Profile,
-                     Report, ResultLine, Suku)
+from .models import (Aldeia, AdministrativePost, AuditLog, Centre, Contestant, Election, Evidence, Municipality,
+                     Nasaun, Party, Profile, Report, ResultLine, TOTPDevice, Village)
 
 
 class ReadOnlyAdmin(admin.ModelAdmin):
@@ -17,28 +17,49 @@ class ReadOnlyAdmin(admin.ModelAdmin):
 
 @admin.register(Municipality)
 class MunicipalityAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "is_special")
+    list_display = ("code", "name", "hckey")
 
 
-@admin.register(Postu)
-class PostuAdmin(admin.ModelAdmin):
+@admin.register(AdministrativePost)
+class PostAdmin(admin.ModelAdmin):
     list_display = ("name", "municipality")
     list_filter = ("municipality",)
     search_fields = ("name",)
 
 
-@admin.register(Suku)
-class SukuAdmin(admin.ModelAdmin):
-    list_display = ("name", "postu")
-    list_filter = ("postu__municipality",)
+@admin.register(Village)
+class VillageAdmin(admin.ModelAdmin):
+    list_display = ("name", "administrativepost")
+    list_filter = ("administrativepost__municipality",)
     search_fields = ("name",)
+
+
+@admin.register(Aldeia)
+class AldeiaAdmin(admin.ModelAdmin):
+    list_display = ("name", "village")
+    search_fields = ("name",)
+
+
+@admin.register(Nasaun)
+class NasaunAdmin(admin.ModelAdmin):
+    list_display = ("name",)
 
 
 @admin.register(Centre)
 class CentreAdmin(admin.ModelAdmin):
-    list_display = ("code", "name", "suku", "registered_voters")
-    list_filter = ("suku__postu__municipality",)
+    list_display = ("code", "name", "village", "nasaun", "registered_voters")
+    list_filter = ("village__administrativepost__municipality", "nasaun")
     search_fields = ("code", "name")
+
+
+@admin.register(TOTPDevice)
+class TOTPAdmin(admin.ModelAdmin):
+    list_display = ("user", "confirmed", "created")
+    exclude = ("secret",)
+    readonly_fields = ("user", "confirmed", "last_counter", "created")
+
+    def has_add_permission(self, request):
+        return False
 
 
 class ContestantInline(admin.TabularInline):

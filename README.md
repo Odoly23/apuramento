@@ -17,7 +17,7 @@ python manage.py runserver
 Tama iha http://localhost:8000 ho: `admin` / `verifikador` (verifikadór), `mdi` (monitór), `pau_nain` (nain-partidu),
 `fiskal_dl_1` (fiskál Dili) — password hanesan ne'ebé ita define.
 
-Teste: `python manage.py test` (22 teste).
+Teste: `python manage.py test` (33 teste).
 
 ## Papél
 | Papél | Bele halo |
@@ -41,6 +41,20 @@ Teste: `python manage.py test` (22 teste).
 6. **Asistente tanya-jawab** (ikon 💬): komprende lian 4; resposta husi dadus diretu (sé lidera, partisipasaun,
    rezultadu [munisípiu], [partidu], konflitu, progresu) no panduan sistema (oinsá hatama, foto, seguransa, papél).
    Baseia ba regra — la haruka dadus ba servisu externu.
+
+## Adisaun foun
+- **2FA (TOTP, RFC 6238)** — app autentikadór (Google/Microsoft Authenticator, Aegis, 2FAS), QR iha `/2fa/setup/`,
+  8 kódigu rekuperasaun (uza dala ida, hash SHA-256), anti-replay, lock 5 tentativa, audit log. **Obrigatóriu ba
+  papél `admin`** (muda ho `TWOFA_REQUIRED_ROLES=admin,fiskal`; mamuk = opsionál hotu). Middleware proteje mós `/admin/`.
+  Nota: segredu TOTP rai iha database (la kriptadu) — uza disk/database ho enkripsaun, no restringe asesu DB.
+- **Mapa Timor-Leste** (`static/geo/tl-all.geo.json`, Highcharts Map Collection, data Natural Earth; hatudu kréditu
+  iha pájina) — SVG ho JavaScript rasik, la presiza Highcharts library. Métrika: lider, partisipasaun, progresu, ka
+  % partidu ida. Atauro la iha poligonu apartadu (inklui iha Dili).
+- **Estrutura jeografia** tuir modelu projetu seluk: `Municipality(code, name, hckey)` → `AdministrativePost` →
+  `Village` → `Aldeia` → `Centre`; `Nasaun` ba **diáspora** (sentru iha rai-li'ur, tab 🌍 iha komparasaun, export CSV,
+  tile iha painel, hatama iha total nasionál).
+- **Helper** `eleisaun/auth_utils.py`: `c_user_fun(user)` (perfíl/fiskál, fila `""` se la iha), `c_user_party(user)`,
+  `c_party_users(party)`, `c_party_centres(party)`. Papél sinkroniza ba Django `Group` (admin/fiskal/monitor).
 
 ## Produksaun
 Define environment: `DJANGO_DEBUG=False`, `DJANGO_SECRET_KEY`, `DJANGO_ALLOWED_HOSTS`, `DJANGO_CSRF_TRUSTED_ORIGINS`,

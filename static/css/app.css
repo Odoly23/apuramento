@@ -104,7 +104,15 @@ select { padding: 8px 10px; }
 .donut > div { width: 118px; height: 118px; border-radius: 50%; background: var(--card); display: grid; place-items: center; text-align: center; }
 .donut b { font-size: 1.5rem; display: block; line-height: 1; } .donut span { font-size: .72rem; color: var(--muted); }
 
-/* ---- tiles (peta) ---- */
+/* ---- peta SVG ---- */
+.tl-region { stroke: var(--card); stroke-width: 1.2px; cursor: pointer; transition: opacity .2s, fill .5s; outline: none; }
+.tl-region:hover, .tl-region:focus { stroke: var(--text); stroke-width: 2.4px; }
+.mapbox { min-height: 160px; }
+.mapinfo { background: var(--card2); border-radius: 12px; padding: 10px 14px; min-height: 76px; font-size: .9rem; }
+.mapleg { display: flex; align-items: center; gap: 8px; font-size: .75rem; color: var(--muted); }
+.mapleg i { flex: 0 0 120px; height: 8px; border-radius: 99px; }
+
+/* ---- tiles ---- */
 .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
 .tile {
   border-radius: 14px; padding: 12px; color: #fff; position: relative; overflow: hidden; min-height: 92px;

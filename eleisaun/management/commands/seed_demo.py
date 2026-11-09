@@ -11,15 +11,19 @@ from django.db import transaction
 from django.utils import timezone
 from PIL import Image, ImageDraw
 
-from eleisaun.models import (AuditLog, Centre, Contestant, Election, Evidence, Municipality, Party, Postu,
-                             Profile, Report, ResultLine, Suku)
+from eleisaun.models import (Aldeia, AdministrativePost, AuditLog, Centre, Contestant, Election, Evidence,
+                             Municipality, Nasaun, Party, Profile, Report, ResultLine, Village)
 from eleisaun.services import compute_flags
 
 User = get_user_model()
 
-MUNIS = [("AL", "Aileu"), ("AN", "Ainaro"), ("AT", "Atauro"), ("BC", "Baucau"), ("BB", "Bobonaro"),
-         ("CL", "Cova Lima"), ("DL", "Dili"), ("ER", "Ermera"), ("LT", "Lautém"), ("LQ", "Liquiçá"),
-         ("MT", "Manatuto"), ("MF", "Manufahi"), ("VQ", "Viqueque"), ("OE", "Oé-Cusse Ambeno")]
+# (kódigu, naran, hc-key Highcharts) — Atauro la iha poligonu apartadu iha mapa (inklui iha Dili)
+MUNIS = [("AL", "Aileu", "tl-al"), ("AN", "Ainaro", "tl-an"), ("AT", "Atauro", None), ("BC", "Baucau", "tl-bc"),
+         ("BB", "Bobonaro", "tl-bb"), ("CL", "Cova Lima", "tl-cl"), ("DL", "Dili", "tl-dl"), ("ER", "Ermera", "tl-er"),
+         ("LT", "Lautém", "tl-bt"), ("LQ", "Liquiçá", "tl-lq"), ("MT", "Manatuto", "tl-mt"),
+         ("MF", "Manufahi", "tl-mf"), ("VQ", "Viqueque", "tl-vq"), ("OE", "Oé-Cusse Ambeno", "tl-am")]
+
+DIASPORA = ["Portugal", "Austrália", "Reino Unido", "Irlanda", "Koreia do Sul"]
 
 PARTIES = [("PAU", "Partidu Aurora Foun", "#e11d48"), ("PUN", "Partidu Unidade Nasionál", "#2563eb"),
            ("PHD", "Partidu Harii Dame", "#16a34a"), ("PBL", "Partidu Bandeira Liberdade", "#f59e0b"),
@@ -54,8 +58,8 @@ class Command(BaseCommand):
     def handle(self, *a, **o):
         rnd = random.Random(o["seed"])
         if o["reset"]:
-            for m in (Evidence, ResultLine, Report, Contestant, Election, Party, Centre, Suku, Postu, Municipality,
-                      AuditLog):
+            for m in (Evidence, ResultLine, Report, Contestant, Election, Party, Centre, Aldeia, Village, AdministrativePost,
+                      Municipality, Nasaun, AuditLog):
                 m.objects.all().delete()
             User.objects.exclude(is_superuser=True).delete()
         elif Municipality.objects.exists():
@@ -67,19 +71,28 @@ class Command(BaseCommand):
         # ---- jeografia
         centres_by_muni = {}
         n = 0
-        for code, name in MUNIS:
-            mu = Municipality.objects.create(code=code, name=name, is_special=(code == "OE"))
+        for code, name, hckey in MUNIS:
+            mu = Municipality.objects.create(code=code, name=name, hckey=hckey)
             lst = []
             for pi in range(1, 4):
-                po = Postu.objects.create(municipality=mu, name=f"Postu {name} {pi}")
+                po = AdministrativePost.objects.create(municipality=mu, name=f"Postu {name} {pi}")
                 for si in range(1, 4):
-                    su = Suku.objects.create(postu=po, name=f"Suku {name} {pi}.{si}")
+                    vi = Village.objects.create(administrativepost=po, name=f"Suku {name} {pi}.{si}")
+                    aldeias = [Aldeia.objects.create(village=vi, name=f"Aldeia {vi.name}-{k}") for k in (1, 2)]
                     for ci in range(1, rnd.choice([2, 2, 3]) + 1):
                         n += 1
                         lst.append(Centre.objects.create(
-                            suku=su, name=f"Sentru {su.name} #{ci}", code=f"{code}-{n:04d}",
-                            registered_voters=rnd.randint(350, 1400)))
+                            village=vi, aldeia=rnd.choice(aldeias), name=f"Sentru {vi.name} #{ci}",
+                            code=f"{code}-{n:04d}", registered_voters=rnd.randint(350, 1400)))
             centres_by_muni[mu.id] = lst
+        dia = []
+        for nm in DIASPORA:
+            ns = Nasaun.objects.create(name=nm)
+            for ci in range(1, rnd.choice([2, 3]) + 1):
+                n += 1
+                dia.append(Centre.objects.create(nasaun=ns, name=f"Sentru {nm} #{ci}", code=f"DP-{n:04d}",
+                                                 registered_voters=rnd.randint(300, 1500)))
+        centres_by_muni["dia"] = dia
 
         # ---- partidu & eleisaun
         parties = [Party.objects.create(acronym=a, name=nm, color=c) for a, nm, c in PARTIES]
@@ -106,24 +119,25 @@ class Command(BaseCommand):
         m2.profile.organization = "Nain-Partidu PAU"; m2.profile.party = parties[0]; m2.profile.save()
 
         fiskais = {}
-        for mu in Municipality.objects.all():
+        groups = [(mu.id, mu.code.lower()) for mu in Municipality.objects.all()] + [("dia", "dp")]
+        for gid, gcode in groups:
             fl = []
             for k in range(1, 4):
-                u = User.objects.create_user(f"fiskal_{mu.code.lower()}_{k}", password=pw)
-                pt = parties[(mu.id + k) % len(parties)]
+                u = User.objects.create_user(f"fiskal_{gcode}_{k}", password=pw)
+                pt = parties[(sum(map(ord, gcode)) + k) % len(parties)]
                 u.profile.role = Profile.FISKAL; u.profile.party = pt
                 u.profile.organization = f"Fiskál {pt.acronym}"; u.profile.save()
-                u.profile.centres.set(centres_by_muni[mu.id])
+                u.profile.centres.set(centres_by_muni[gid])
                 fl.append(u)
-            fiskais[mu.id] = fl
+            fiskais[gid] = fl
 
         # ---- relatóriu
         total_reports = 0
         for election, contestants, coverage in ((par, par_c, 0.7), (pres, pres_c, 0.35)):
             base = [rnd.uniform(0.6, 1.6) for _ in contestants]
-            for mu in Municipality.objects.all():
+            for gid in [mu.id for mu in Municipality.objects.all()] + ["dia"]:
                 bias = [b * rnd.lognormvariate(0, 0.45) for b in base]
-                for ce in centres_by_muni[mu.id]:
+                for ce in centres_by_muni[gid]:
                     if rnd.random() > coverage:
                         continue
                     k = rnd.choices([1, 2, 3], [0.55, 0.35, 0.10])[0]
@@ -135,7 +149,7 @@ class Command(BaseCommand):
                     votes = [int(valid * x / s) for x in w]
                     votes[0] += valid - sum(votes)
                     conflict = k >= 2 and rnd.random() < 0.15
-                    for i, u in enumerate(rnd.sample(fiskais[mu.id], k)):
+                    for i, u in enumerate(rnd.sample(fiskais[gid], k)):
                         vts, bl, inv = list(votes), blank, invalid
                         if conflict and i == 1:
                             j, l = rnd.sample(range(len(vts)), 2)
@@ -161,5 +175,5 @@ class Command(BaseCommand):
 
         self.stdout.write(self.style.SUCCESS(f"Sentru: {n} · relatóriu: {total_reports}"))
         self.stdout.write("Utilizadór DEMO (password hanesan hotu): " + self.style.WARNING(pw))
-        self.stdout.write("  admin / verifikador (admin) · mdi (monitór) · pau_nain (nain-partidu) · fiskal_dl_1 (fiskál Dili)")
+        self.stdout.write("  admin / verifikador (admin) · mdi (monitór) · pau_nain (nain-partidu) · fiskal_dl_1 (fiskál Dili) · fiskal_dp_1 (diáspora)")
         self.stdout.write(self.style.WARNING("DADUS FIKTISIU — la bele uza iha produksaun."))

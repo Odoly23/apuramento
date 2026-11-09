@@ -12,17 +12,28 @@
     <div class="card"><h2>🧭 {% t 'status' %}</h2><div id="states" class="small"></div></div>
   </div>
 </div>
-<div class="card" style="margin-top:16px"><h2>🗺️ {% t 'map_by_region' %}</h2><div class="tiles" id="tiles"></div></div>
+<div class="grid g-main" style="margin-top:16px">
+  <div class="card"><h2>🗺️ {% t 'map_by_region' %}
+      <span class="right"></span><label class="small muted" for="metric">{% t 'map_metric' %}</label>
+      <select id="metric"></select></h2>
+    <div class="mapbox" id="map" data-geo="{% static 'geo/tl-all.geo.json' %}"></div>
+    <div class="mapleg" id="mapleg"></div>
+    <p class="muted small" style="margin:6px 0 0">{% t 'map_note' %}</p></div>
+  <div class="card"><h2>📍 <span id="mapname">—</span></h2><div class="mapinfo" id="mapinfo"></div>
+    <h2 style="margin-top:16px">🌍 {% t 'diaspora' %}</h2><div class="tiles" id="dtiles" style="grid-template-columns:repeat(auto-fill,minmax(110px,1fr))"></div></div>
+</div>
+<div class="card" style="margin-top:16px"><h2>🧱 {% t 'municipality' %}</h2><div class="tiles" id="tiles"></div></div>
 <div class="grid g2" style="margin-top:16px">
   <div class="card"><h2>⚡ {% t 'activity' %}</h2><div class="feed" id="feed"></div></div>
   <div class="card"><h2>⬇️ {% t 'export_csv' %}</h2>
     <p class="muted small">CSV · {% t 'municipality' %} / {% t 'postu' %} / {% t 'suku' %}</p>
     <a class="btn" href="{% url 'export_csv' 'municipality' %}?e={{ election.id }}">{% t 'municipality' %}</a>
     <a class="btn" href="{% url 'export_csv' 'postu' %}?e={{ election.id }}">{% t 'postu' %}</a>
-    <a class="btn" href="{% url 'export_csv' 'suku' %}?e={{ election.id }}">{% t 'suku' %}</a></div>
+    <a class="btn" href="{% url 'export_csv' 'suku' %}?e={{ election.id }}">{% t 'suku' %}</a>
+    <a class="btn" href="{% url 'export_csv' 'nasaun' %}?e={{ election.id }}">🌍 {% t 'diaspora' %}</a></div>
 </div>
 {{ snap|json_script:"snap" }}
 {{ my_party|json_script:"myParty" }}
 {% endif %}
 {% endblock %}
-{% block scripts %}{% if snap %}<script src="{% static 'js/dashboard.js' %}" defer></script>{% endif %}{% endblock %}
+{% block scripts %}{% if snap %}<script src="{% static 'js/map.js' %}" defer></script><script src="{% static 'js/dashboard.js' %}" defer></script>{% endif %}{% endblock %}

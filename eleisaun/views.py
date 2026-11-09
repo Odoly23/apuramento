@@ -14,6 +14,7 @@ from django.utils import timezone
 from django.views.decorators.http import require_POST
 
 from . import chatbot
+from .auth_utils import c_user_fun
 from .forms import ReportForm
 from .i18n import LANGS, all_for, tr
 from .models import AuditLog, Centre, Contestant, Evidence, Profile, Report, ResultLine, client_ip
@@ -29,7 +30,9 @@ def role_view(*roles):
         @wraps(fn)
         @login_required
         def wrapper(request, *args, **kwargs):
-            p = request.user.profile
+            p = c_user_fun(request.user)
+            if not p:
+                return render(request, "403.html", status=403)
             ok = (
                 ("admin" in roles and p.is_admin)
                 or ("fiskal" in roles and p.is_fiskal)
@@ -47,6 +50,9 @@ def role_view(*roles):
         return wrapper
 
     return deco
+
+
+LEVELS = {"municipality": "municipalities", "postu": "postus", "suku": "sukus", "nasaun": "nasauns"}
 
 
 def _snapshot_for_page(election):
@@ -85,6 +91,7 @@ class ThrottledLoginView(auth_views.LoginView):
     def form_valid(self, form):
         cache.delete(self._key(self.request))
         resp = super().form_valid(form)
+        self.request.session.pop("otp_ok", None)
         AuditLog.record(self.request.user, "login", ip=client_ip(self.request))
         return resp
 
@@ -134,7 +141,7 @@ def api_live(request):
         return JsonResponse({"error": "no election"}, status=404)
     snap = build_snapshot(request.election)
     level = request.GET.get("level", "municipality")
-    key = {"municipality": "municipalities", "postu": "postus", "suku": "sukus"}.get(level, "municipalities")
+    key = LEVELS.get(level, "municipalities")
     nodes = snap[key]
     parent = request.GET.get("parent")
     if parent and parent.isdigit():
@@ -146,7 +153,7 @@ def api_live(request):
     return JsonResponse({
         "election": snap["election"], "contestants": snap["contestants"], "national": snap["national"],
         "nodes": nodes, "level": level, "states": snap["states"], "recent": snap["recent"],
-        "municipalities": snap["municipalities"],
+        "municipalities": snap["municipalities"], "nasauns": snap["nasauns"], "diaspora": snap["diaspora"],
         "now": timezone.now().isoformat(),
     })
 
@@ -158,7 +165,7 @@ def _csv_safe(v):
 
 @role_view("monitor")
 def export_csv(request, level):
-    key = {"municipality": "municipalities", "postu": "postus", "suku": "sukus"}.get(level)
+    key = LEVELS.get(level)
     if not key or not request.election:
         raise Http404
     snap = build_snapshot(request.election)
@@ -180,7 +187,7 @@ def export_csv(request, level):
 @role_view("fiskal")
 def fiskal_home(request):
     e = request.election
-    centres = list(request.user.profile.centres.select_related("suku__postu__municipality"))
+    centres = list(request.user.profile.centres.select_related("village__administrativepost__municipality", "nasaun"))
     rows = []
     if e:
         reps = {}
@@ -202,7 +209,7 @@ def fiskal_home(request):
 @role_view("fiskal")
 def submit_report(request, centre_id):
     e = request.election
-    centre = get_object_or_404(Centre.objects.select_related("suku__postu__municipality"), pk=centre_id)
+    centre = get_object_or_404(Centre.objects.select_related("village__administrativepost__municipality", "nasaun"), pk=centre_id)
     if not request.user.profile.centres.filter(pk=centre.pk).exists():
         return render(request, "403.html", status=403)
     contestants = list(Contestant.objects.filter(election=e).select_related("party"))
@@ -265,7 +272,8 @@ def _can_view_report(user, report):
 @role_view()
 def report_detail(request, pk):
     report = get_object_or_404(
-        Report.objects.select_related("centre__suku__postu__municipality", "submitted_by", "reviewed_by",
+        Report.objects.select_related("centre__village__administrativepost__municipality", "centre__nasaun", "submitted_by",
+                                      "reviewed_by",
                                       "election").prefetch_related("lines__contestant__party", "evidence"), pk=pk)
     if not _can_view_report(request.user, report):
         return render(request, "403.html", status=403)

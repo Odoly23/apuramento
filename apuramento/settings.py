@@ -43,6 +43,7 @@ MIDDLEWARE = [
     "django.middleware.clickjacking.XFrameOptionsMiddleware",
     "eleisaun.security.SecurityHeadersMiddleware",
     "eleisaun.security.LanguageMiddleware",
+    "eleisaun.security.TwoFactorMiddleware",
 ]
 
 ROOT_URLCONF = "apuramento.urls"
@@ -119,6 +120,9 @@ MAX_EVIDENCE_BYTES = 8 * 1024 * 1024
 MAX_EVIDENCE_FILES = 6
 DATA_UPLOAD_MAX_MEMORY_SIZE = 60 * 1024 * 1024
 FILE_UPLOAD_PERMISSIONS = 0o640
+
+# --- 2FA: papél ne'ebé OBRIGATÓRIU uza 2FA (separa ho vírgula; mamuk = opsionál hotu)
+TWOFA_REQUIRED_ROLES = [r for r in os.environ.get("TWOFA_REQUIRED_ROLES", "admin").split(",") if r]
 
 # --- Login throttle ----------------------------------------------------------
 LOGIN_MAX_ATTEMPTS = 5

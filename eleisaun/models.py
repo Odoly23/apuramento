@@ -10,50 +10,73 @@ from django.utils import timezone
 
 
 # --------------------------------------------------------------------------
-# Jeografia: Munisípiu > Postu Administrativu > Suku > Sentru Votasaun
+# Jeografia: Municipality > AdministrativePost > Village > Aldeia > Centre
+# + Nasaun (diáspora: sentru votasaun iha rai-li'ur)
 # --------------------------------------------------------------------------
 class Municipality(models.Model):
-    code = models.CharField(max_length=4, unique=True)
-    name = models.CharField(max_length=80)
-    is_special = models.BooleanField("Rejiaun espesiál (RAEOA)", default=False)
+    code = models.CharField(max_length=5, null=True)
+    name = models.CharField(max_length=50, verbose_name="Naran")
+    hckey = models.CharField(max_length=10, null=True, blank=True, help_text="Highcharts hc-key, ez. tl-dl")
 
     class Meta:
         ordering = ["name"]
-        verbose_name = "Munisípiu"
-        verbose_name_plural = "Munisípiu"
 
     def __str__(self):
-        return self.name
+        template = '{0.name}'
+        return template.format(self)
 
 
-class Postu(models.Model):
-    municipality = models.ForeignKey(Municipality, on_delete=models.CASCADE, related_name="postus")
-    name = models.CharField(max_length=80)
+class AdministrativePost(models.Model):
+    municipality = models.ForeignKey(Municipality, on_delete=models.CASCADE, null=True)
+    name = models.CharField(max_length=100, verbose_name="Naran")
 
     class Meta:
         ordering = ["municipality__name", "name"]
-        verbose_name = "Postu Administrativu"
-        verbose_name_plural = "Postu Administrativu"
 
     def __str__(self):
-        return f"{self.name} ({self.municipality})"
+        template = '{0.name}'
+        return template.format(self)
 
 
-class Suku(models.Model):
-    postu = models.ForeignKey(Postu, on_delete=models.CASCADE, related_name="sukus")
-    name = models.CharField(max_length=80)
+class Village(models.Model):
+    administrativepost = models.ForeignKey(AdministrativePost, on_delete=models.CASCADE, null=True)
+    name = models.CharField(max_length=100, verbose_name="Naran")
 
     class Meta:
-        ordering = ["postu__name", "name"]
-        verbose_name = "Suku"
-        verbose_name_plural = "Suku"
+        ordering = ["administrativepost__name", "name"]
 
     def __str__(self):
-        return f"{self.name}"
+        template = '{0.name}'
+        return template.format(self)
+
+
+class Aldeia(models.Model):
+    village = models.ForeignKey(Village, on_delete=models.CASCADE, null=True)
+    name = models.CharField(max_length=100)
+
+    def __str__(self):
+        template = '{0.name}'
+        return template.format(self)
+
+
+class Nasaun(models.Model):
+    name = models.CharField(max_length=50, verbose_name='Nasaun')
+
+    class Meta:
+        ordering = ["name"]
+
+    def __str__(self):
+        template = '{0.name}'
+        return template.format(self)
 
 
 class Centre(models.Model):
-    suku = models.ForeignKey(Suku, on_delete=models.CASCADE, related_name="centres")
+    """Sentru votasaun: iha Timor (village/aldeia) ka diáspora (nasaun)."""
+
+    village = models.ForeignKey(Village, on_delete=models.CASCADE, null=True, blank=True, related_name="centres")
+    aldeia = models.ForeignKey(Aldeia, on_delete=models.SET_NULL, null=True, blank=True)
+    nasaun = models.ForeignKey(Nasaun, on_delete=models.CASCADE, null=True, blank=True, related_name="centres",
+                               help_text="Hili de'it ba sentru diáspora (la iha village)")
     name = models.CharField(max_length=120)
     code = models.CharField(max_length=20, unique=True)
     registered_voters = models.PositiveIntegerField("Eleitór rejistadu", default=0)
@@ -67,12 +90,21 @@ class Centre(models.Model):
         return f"{self.code} · {self.name}"
 
     @property
-    def postu(self):
-        return self.suku.postu
+    def is_diaspora(self):
+        return self.village_id is None and self.nasaun_id is not None
 
     @property
     def municipality(self):
-        return self.suku.postu.municipality
+        return self.village.administrativepost.municipality if self.village_id else None
+
+    @property
+    def location(self):
+        if self.is_diaspora:
+            return f"Diáspora · {self.nasaun}"
+        if not self.village_id:
+            return "—"
+        v = self.village
+        return f"{v.name} · {v.administrativepost.name} · {v.administrativepost.municipality.name}"
 
 
 # --------------------------------------------------------------------------
@@ -337,3 +369,34 @@ class AuditLog(models.Model):
 
 def client_ip(request):
     return request.META.get("REMOTE_ADDR") or None
+
+
+# --------------------------------------------------------------------------
+# 2FA (TOTP, RFC 6238) + kódigu rekuperasaun
+# --------------------------------------------------------------------------
+class TOTPDevice(models.Model):
+    user = models.OneToOneField(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="totp")
+    secret = models.CharField(max_length=64)
+    confirmed = models.BooleanField(default=False)
+    last_counter = models.BigIntegerField(default=0)
+    created = models.DateTimeField(default=timezone.now)
+
+    class Meta:
+        verbose_name = "Dispozitivu 2FA"
+        verbose_name_plural = "Dispozitivu 2FA"
+
+
+class RecoveryCode(models.Model):
+    user = models.ForeignKey(settings.AUTH_USER_MODEL, on_delete=models.CASCADE, related_name="recovery_codes")
+    code_hash = models.CharField(max_length=64)
+    used_at = models.DateTimeField(null=True, blank=True)
+
+
+@receiver(post_save, sender=Profile)
+def sync_group(sender, instance, **kwargs):
+    """Papél -> Django Group ho naran hanesan (admin / fiskal / monitor), ba admin site no relatóriu."""
+    from django.contrib.auth.models import Group
+    names = [r for r, _ in Profile.ROLES]
+    keep, _ = Group.objects.get_or_create(name=instance.role)
+    instance.user.groups.remove(*Group.objects.filter(name__in=names).exclude(pk=keep.pk))
+    instance.user.groups.add(keep)

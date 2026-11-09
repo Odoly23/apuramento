@@ -1,6 +1,6 @@
 from django.urls import path
 
-from . import views
+from . import views, views_2fa
 
 urlpatterns = [
     path("", views.home, name="home"),
@@ -18,5 +18,9 @@ urlpatterns = [
     path("verifikasaun/", views.verification, name="verification"),
     path("audit/", views.audit, name="audit"),
     path("prova/<int:pk>/", views.evidence_file, name="evidence_file"),
+    path("2fa/setup/", views_2fa.setup, name="twofa_setup"),
+    path("2fa/verify/", views_2fa.verify, name="twofa_verify"),
+    path("2fa/codes/", views_2fa.regenerate, name="twofa_codes"),
+    path("2fa/disable/", views_2fa.disable, name="twofa_disable"),
     path("api/chat/", views.chat_api, name="chat_api"),
 ]

@@ -14,7 +14,7 @@
   <div class="card">
     <div style="display:flex;gap:10px;align-items:flex-start">
       <div style="flex:1"><h3>{{ r.centre.name }}</h3>
-        <div class="muted small">{{ r.centre.code }} · {{ r.centre.suku.name }} · {{ r.centre.suku.postu.name }} · {{ r.centre.suku.postu.municipality.name }}</div>
+        <div class="muted small">{{ r.centre.code }} · {{ r.centre.location }}</div>
         <div class="muted small">{% t 'registered' %}: <b>{{ r.centre.registered_voters|fmt }}</b></div></div>
       {% if r.own %}<span class="badge {{ r.own.status|status_class }}">{% if r.own.status == 'pending' %}{% t 'pending' %}{% elif r.own.status == 'verified' %}{% t 'verified' %}{% else %}{% t 'rejected' %}{% endif %}</span>
       {% else %}<span class="badge muted">{% t 'not_submitted' %}</span>{% endif %}

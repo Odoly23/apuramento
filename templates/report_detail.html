@@ -5,7 +5,7 @@
 <div class="grid g2">
   <div class="card">
     <h2>🗳️ {{ report.election.name }}</h2>
-    <p class="muted small">{{ report.centre.code }} · {{ report.centre.suku.name }} · {{ report.centre.suku.postu.name }} · {{ report.centre.suku.postu.municipality.name }}</p>
+    <p class="muted small">{{ report.centre.code }} · {{ report.centre.location }}</p>
     <p>{% t 'submitted_by' %}: <b>{{ report.submitted_by.get_username }}</b> · v{{ report.version }} · {{ report.updated_at|date:"d/m/Y H:i" }}
       <span class="badge {{ report.status|status_class }}">{% if report.status == 'pending' %}{% t 'pending' %}{% elif report.status == 'verified' %}{% t 'verified' %}{% else %}{% t 'rejected' %}{% endif %}</span></p>
     <div class="tbl-wrap"><table>

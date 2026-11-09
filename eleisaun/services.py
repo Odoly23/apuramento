@@ -37,10 +37,10 @@ class Node:
     """Agregasaun ba rejiaun (nasionál, munisípiu, postu, suku)."""
 
     __slots__ = ("id", "name", "parent", "centres_total", "centres_reporting", "registered",
-                 "registered_reporting", "voted", "blank", "invalid", "votes", "conflicts")
+                 "registered_reporting", "voted", "blank", "invalid", "votes", "conflicts", "hckey")
 
-    def __init__(self, id, name, parent=None):
-        self.id, self.name, self.parent = id, name, parent
+    def __init__(self, id, name, parent=None, hckey=None):
+        self.id, self.name, self.parent, self.hckey = id, name, parent, hckey
         self.centres_total = self.centres_reporting = 0
         self.registered = self.registered_reporting = 0
         self.voted = self.blank = self.invalid = 0
@@ -70,7 +70,7 @@ class Node:
         leader = ranked[0][0] if ranked and ranked[0][1] > 0 else None
         margin = (ranked[0][1] - ranked[1][1]) if len(ranked) > 1 else (ranked[0][1] if ranked else 0)
         return {
-            "id": self.id, "name": self.name, "parent": self.parent,
+            "id": self.id, "name": self.name, "parent": self.parent, "hckey": self.hckey,
             "centres_total": self.centres_total, "centres_reporting": self.centres_reporting,
             "progress": round(100 * self.centres_reporting / self.centres_total, 1) if self.centres_total else 0,
             "registered": self.registered, "voted": self.voted, "blank": self.blank, "invalid": self.invalid,
@@ -128,18 +128,23 @@ def build_snapshot(election, use_cache=True):
             return snap
 
     contestants = list(Contestant.objects.filter(election=election).select_related("party"))
-    centres = Centre.objects.select_related("suku__postu__municipality")
+    centres = Centre.objects.select_related("village__administrativepost__municipality", "nasaun")
     cons = consolidate(election)
 
     national = Node("all", "Timor-Leste")
-    munis, postus, sukus = {}, {}, {}
+    diaspora = Node("dia", "Diáspora")
+    munis, postus, sukus, nasauns = {}, {}, {}, {}
     states = defaultdict(int)
     for ce in centres:
-        su, po, mu = ce.suku, ce.suku.postu, ce.suku.postu.municipality
-        m = munis.setdefault(mu.id, Node(mu.id, mu.name))
-        p = postus.setdefault(po.id, Node(po.id, po.name, parent=mu.id))
-        s = sukus.setdefault(su.id, Node(su.id, su.name, parent=po.id))
-        nodes = (national, m, p, s)
+        if ce.is_diaspora:
+            nodes = (national, diaspora, nasauns.setdefault(ce.nasaun_id, Node(ce.nasaun_id, ce.nasaun.name)))
+        else:
+            vi, po = ce.village, ce.village.administrativepost
+            mu = po.municipality
+            m = munis.setdefault(mu.id, Node(mu.id, mu.name, hckey=mu.hckey))
+            p = postus.setdefault(po.id, Node(po.id, po.name, parent=mu.id))
+            s = sukus.setdefault(vi.id, Node(vi.id, vi.name, parent=po.id))
+            nodes = (national, m, p, s)
         for n in nodes:
             n.add_centre(ce)
         c = cons.get(ce.id)
@@ -154,7 +159,7 @@ def build_snapshot(election, use_cache=True):
         for n in nodes:
             n.add_result(ce, c)
 
-    recent = (Report.objects.filter(election=election).select_related("centre__suku__postu__municipality", "submitted_by")
+    recent = (Report.objects.filter(election=election).select_related("centre__village__administrativepost__municipality", "centre__nasaun", "submitted_by")
               .order_by("-updated_at")[:12])
     snap = {
         "election": {"id": election.id, "name": election.name, "kind": election.kind, "date": str(election.date)},
@@ -162,11 +167,13 @@ def build_snapshot(election, use_cache=True):
                          "color": c.color, "party_id": c.party_id} for c in contestants],
         "national": national.as_dict(),
         "municipalities": sorted((n.as_dict() for n in munis.values()), key=lambda d: d["name"]),
+        "nasauns": sorted((n.as_dict() for n in nasauns.values()), key=lambda d: d["name"]),
+        "diaspora": diaspora.as_dict(),
         "postus": [n.as_dict() for n in postus.values()],
         "sukus": [n.as_dict() for n in sukus.values()],
         "states": dict(states),
         "recent": [{
-            "id": r.id, "centre": r.centre.name, "code": r.centre.code, "muni": r.centre.municipality.name,
+            "id": r.id, "centre": r.centre.name, "code": r.centre.code, "muni": r.centre.municipality.name if r.centre.municipality else f"Diáspora · {r.centre.nasaun}",
             "by": r.submitted_by.get_username(), "status": r.status, "at": r.updated_at.isoformat(),
         } for r in recent],
     }

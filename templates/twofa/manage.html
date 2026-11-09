@@ -1,0 +1,20 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}2FA{% endblock %}
+{% block topbar %}<h1>🔐 {% t 'twofa' %}</h1>{% endblock %}
+{% block content %}
+<div class="card" style="max-width:560px">
+  <p><span class="badge ok">{% t 'twofa_enabled' %}</span></p>
+  <p class="muted">{% t 'twofa_remaining' %}: <b>{{ remaining }}</b></p>
+  <form method="post" action="{% url 'twofa_codes' %}">{% csrf_token %}
+    <div class="field"><label>{% t 'twofa_code' %}</label><input name="code" inputmode="numeric" autocomplete="one-time-code" maxlength="7" required></div>
+    <button class="btn" type="submit">🔁 {% t 'twofa_regen' %}</button>
+  </form>
+  <hr style="border:0;border-top:1px solid var(--line);margin:18px 0">
+  {% if required %}<p class="muted small">{% t 'twofa_mandatory' %}</p>{% else %}
+  <form method="post" action="{% url 'twofa_disable' %}">{% csrf_token %}
+    <div class="field"><label>{% t 'password' %}</label><input type="password" name="password" required></div>
+    <div class="field"><label>{% t 'twofa_code' %}</label><input name="code" inputmode="numeric" maxlength="7" required></div>
+    <button class="btn danger" type="submit">{% t 'twofa_disable' %}</button>
+  </form>{% endif %}
+</div>
+{% endblock %}

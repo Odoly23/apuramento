@@ -32,8 +32,8 @@
     var b = e.target.closest("button"); if (!b) return;
     state.level = b.dataset.level; state.parent = "";
     [].forEach.call(seg.children, function (x) { x.classList.toggle("on", x === b); });
-    ps.classList.toggle("hide", state.level === "municipality");
-    if (state.level !== "municipality") {
+    ps.classList.toggle("hide", state.level === "municipality" || state.level === "nasaun");
+    if (state.level === "postu" || state.level === "suku") {
       ps.innerHTML = '<option value="">' + esc(T.all) + "</option>" + snap.municipalities.map(function (m) { return '<option value="' + m.id + '">' + esc(m.name) + "</option>"; }).join("");
     }
     load();

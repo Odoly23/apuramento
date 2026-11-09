@@ -10,8 +10,10 @@ from django.urls import reverse
 from PIL import Image
 
 from . import chatbot
-from .models import (AuditLog, Centre, Contestant, Election, Municipality, Party, Postu, Profile, Report,
-                     Suku)
+from . import twofa
+from .auth_utils import c_user_fun, c_user_party
+from .models import (AdministrativePost, AuditLog, Centre, Contestant, Election, Municipality, Nasaun, Party,
+                     Profile, Report, TOTPDevice, Village)
 from .services import build_snapshot
 
 User = get_user_model()
@@ -33,11 +35,13 @@ class Base(TestCase):
 
     def setUp(self):
         cache.clear()
-        mu = Municipality.objects.create(code="DL", name="Dili")
-        po = Postu.objects.create(municipality=mu, name="P1")
-        su = Suku.objects.create(postu=po, name="S1")
-        self.c1 = Centre.objects.create(suku=su, name="C1", code="DL-1", registered_voters=1000)
-        self.c2 = Centre.objects.create(suku=su, name="C2", code="DL-2", registered_voters=500)
+        mu = Municipality.objects.create(code="DL", name="Dili", hckey="tl-dl")
+        po = AdministrativePost.objects.create(municipality=mu, name="P1")
+        su = Village.objects.create(administrativepost=po, name="S1")
+        self.c1 = Centre.objects.create(village=su, name="C1", code="DL-1", registered_voters=1000)
+        self.c2 = Centre.objects.create(village=su, name="C2", code="DL-2", registered_voters=500)
+        self.pt = Nasaun.objects.create(name="Portugal")
+        self.c3 = Centre.objects.create(nasaun=self.pt, name="Lisboa", code="DP-1", registered_voters=800)
         self.pa = Party.objects.create(acronym="AAA", name="Alfa", color="#ff0000")
         self.pb = Party.objects.create(acronym="BBB", name="Beta", color="#0000ff")
         self.el = Election.objects.create(name="E", kind="parliamentary", date="2026-01-01")
@@ -57,6 +61,9 @@ class Base(TestCase):
 
     def login(self, user):
         self.client.force_login(user)
+        s = self.client.session
+        s["otp_ok"] = True  # 2FA diskute iha TwoFactorTests
+        s.save()
 
     def post(self, user, centre, a, b, blank=0, invalid=0, voted=None, photo=True):
         self.login(user)
@@ -194,7 +201,7 @@ class SecurityTests(Base):
         self.assertEqual(r.status_code, 429)
 
     def test_anonymous_redirected(self):
-        for name in ("dashboard", "compare", "api_live", "fiskal_home", "verification", "audit"):
+        for name in ("dashboard", "compare", "api_live", "fiskal_home", "verification", "audit", "twofa_setup"):
             self.assertEqual(self.client.get(reverse(name)).status_code, 302)
 
     def test_role_isolation(self):
@@ -253,3 +260,118 @@ class ApiAndChatTests(Base):
         r = self.client.post(reverse("chat_api"), data='{"q":"seguransa"}', content_type="application/json")
         self.assertEqual(r.status_code, 200)
         self.assertIn("hash", r.json()["a"].lower())
+
+
+class TwoFactorTests(Base):
+    def test_rfc6238_vector(self):
+        secret = "GEZDGNBVGY3TQOJQGEZDGNBVGY3TQOJQ"  # "12345678901234567890"
+        self.assertEqual(twofa.totp_at(secret, 59, digits=8), "94287082")
+        self.assertEqual(twofa.totp_at(secret, 1111111109, digits=8), "07081804")
+
+    def test_verify_window_and_replay(self):
+        sec = twofa.new_secret()
+        code = twofa.totp_at(sec)
+        c = twofa.verify(sec, code)
+        self.assertTrue(c)
+        self.assertIsNone(twofa.verify(sec, code, last_counter=c))  # replay
+        self.assertIsNone(twofa.verify(sec, "000000" if code != "000000" else "111111"))
+        self.assertIsNone(twofa.verify(sec, "abc"))
+
+    def enable(self, user):
+        self.client.force_login(user)
+        self.client.get(reverse("twofa_setup"))
+        dev = TOTPDevice.objects.get(user=user)
+        r = self.client.post(reverse("twofa_setup"), {"code": twofa.totp_at(dev.secret)})
+        self.assertEqual(r.status_code, 200)
+        self.assertEqual(user.recovery_codes.count(), 8)
+        return TOTPDevice.objects.get(user=user), r.context["codes"]
+
+    def test_admin_forced_to_setup(self):
+        self.client.force_login(self.admin)
+        r = self.client.get(reverse("audit"))
+        self.assertRedirects(r, reverse("twofa_setup"), fetch_redirect_response=False)
+        self.client.force_login(self.mon)  # monitór la obrigatóriu
+        self.assertEqual(self.client.get(reverse("dashboard")).status_code, 200)
+
+    def test_full_flow_enable_logout_verify(self):
+        dev, codes = self.enable(self.mon)
+        self.client.post(reverse("logout"))
+        r = self.client.post(reverse("login"), {"username": "mon", "password": "Str0ng-pass-123"})
+        self.assertEqual(r.status_code, 302)
+        self.assertRedirects(self.client.get(reverse("dashboard")), "/2fa/verify/?next=/painel/", fetch_redirect_response=False)
+        # kódigu sala
+        self.client.post(reverse("twofa_verify"), {"code": "123456"})
+        self.assertRedirects(self.client.get(reverse("dashboard")), "/2fa/verify/?next=/painel/", fetch_redirect_response=False)
+        dev.refresh_from_db()
+        ok = self.client.post(reverse("twofa_verify"), {"code": twofa.totp_at(dev.secret, __import__("time").time() + 30)})
+        self.assertEqual(ok.status_code, 302)
+        self.assertEqual(self.client.get(reverse("dashboard")).status_code, 200)
+
+    def test_recovery_code_single_use(self):
+        dev, codes = self.enable(self.mon)
+        for _ in range(2):
+            self.client.post(reverse("logout"))
+            self.client.post(reverse("login"), {"username": "mon", "password": "Str0ng-pass-123"})
+            self.client.post(reverse("twofa_verify"), {"code": codes[0]})
+            ok = self.client.get(reverse("dashboard")).status_code == 200
+            self.assertEqual(ok, _ == 0)
+
+    def test_2fa_lockout(self):
+        self.enable(self.mon)
+        self.client.post(reverse("logout"))
+        self.client.post(reverse("login"), {"username": "mon", "password": "Str0ng-pass-123"})
+        for _ in range(5):
+            self.client.post(reverse("twofa_verify"), {"code": "000000"})
+        dev = TOTPDevice.objects.get(user=self.mon)
+        self.client.post(reverse("twofa_verify"), {"code": twofa.totp_at(dev.secret, __import__("time").time() + 30)})
+        self.assertRedirects(self.client.get(reverse("dashboard")), "/2fa/verify/?next=/painel/", fetch_redirect_response=False)
+
+    def test_admin_cannot_disable(self):
+        dev, _ = self.enable(self.admin)
+        r = self.client.post(reverse("twofa_disable"), {"password": "Str0ng-pass-123", "code": "1"})
+        self.assertTrue(TOTPDevice.objects.filter(user=self.admin).exists())
+
+
+class DiasporaAndHelperTests(Base):
+    def test_helpers(self):
+        self.assertEqual(c_user_fun(self.f1), self.f1.profile)
+        self.assertEqual(c_user_fun(User(username="ghost")), "")
+        self.assertEqual(c_user_fun(None), "")
+        self.f1.profile.party = self.pa
+        self.f1.profile.save()
+        self.assertEqual(c_user_party(self.f1), self.pa)
+        self.assertEqual(c_user_party(self.f2), "")
+
+    def test_groups_synced(self):
+        self.assertEqual(list(self.admin.groups.values_list("name", flat=True)), ["admin"])
+        self.assertEqual(list(self.f1.groups.values_list("name", flat=True)), ["fiskal"])
+
+    def test_diaspora_counted_and_listed(self):
+        f = self.mk("fd", Profile.FISKAL, centres=[self.c3])
+        self.post(f, self.c3, 300, 100)
+        self.post(self.f1, self.c1, 10, 5)
+        cache.clear()
+        s = build_snapshot(self.el, use_cache=False)
+        self.assertEqual(s["national"]["valid"], 415)
+        self.assertEqual(s["diaspora"]["valid"], 400)
+        self.assertEqual(s["nasauns"][0]["name"], "Portugal")
+        self.assertEqual(s["municipalities"][0]["hckey"], "tl-dl")
+        self.assertEqual(s["municipalities"][0]["valid"], 15)
+        self.login(self.mon)
+        self.assertEqual(self.client.get(reverse("api_live") + "?level=nasaun").json()["nodes"][0]["valid"], 400)
+        self.assertIn("Portugal", self.client.get(reverse("export_csv", args=["nasaun"])).content.decode())
+        self.assertIn("Portugal", chatbot.answer("resultados Portugal", "pt", self.mon.profile, self.el))
+        self.assertIn("Diáspora", chatbot.answer("diaspora", "pt", self.mon.profile, self.el))
+        self.login(f)
+        self.assertEqual(self.client.get(reverse("fiskal_home")).status_code, 200)
+        self.assertIn("Diáspora", self.c3.location)
+
+    def test_geojson_served_and_matches_hckeys(self):
+        import json
+        from django.conf import settings
+        d = json.load(open(settings.BASE_DIR / "static/geo/tl-all.geo.json"))
+        keys = {f["properties"]["hc-key"] for f in d["features"]}
+        self.assertIn("tl-dl", keys)
+        self.login(self.mon)
+        html = self.client.get(reverse("dashboard")).content.decode()
+        self.assertIn("geo/tl-all.geo.json", html)

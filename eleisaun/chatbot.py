@@ -149,7 +149,8 @@ def answer(text, lang, user_profile, election):
 
     # Entidade spesífiku (munisípiu/partidu) -> prioridade ba dadus
     if snap and snap["national"]["valid"] >= 0:
-        names = {norm(m["name"]).strip(): m for m in snap["municipalities"]}
+        names = {norm(m["name"]).strip(): m for m in snap["municipalities"] + snap["nasauns"]}
+        names["diaspora"] = snap["diaspora"]
         for key, m in sorted(names.items(), key=lambda kv: -len(kv[0])):
             if key and re.search(rf"\b{re.escape(key)}\b", t):
                 return _region_answer(m, snap, lang)

@@ -3,7 +3,7 @@
 {% block topbar %}<a class="btn ghost" href="{% url 'fiskal_home' %}">← {% t 'back' %}</a><h1>{{ centre.name }}</h1>{% endblock %}
 {% block content %}
 <div class="card" style="margin-bottom:16px">
-  <div class="muted">{{ centre.code }} · {{ centre.suku.name }} · {{ centre.suku.postu.name }} · {{ centre.suku.postu.municipality.name }}</div>
+  <div class="muted">{{ centre.code }} · {{ centre.location }}</div>
   <div>{% t 'registered' %}: <b id="registered" data-n="{{ centre.registered_voters }}">{{ centre.registered_voters|fmt }}</b>
     · {{ election.name }}</div>
   {% if locked %}<div class="msg error" style="margin-top:10px">🔒 {% t 'err_locked' %}</div>{% endif %}

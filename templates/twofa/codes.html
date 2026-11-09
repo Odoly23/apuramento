@@ -1,0 +1,10 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}2FA{% endblock %}
+{% block topbar %}<h1>🔑 {% t 'twofa_codes_title' %}</h1>{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px">
+  <p class="muted">{% t 'twofa_codes_help' %}</p>
+  <div class="grid" style="grid-template-columns:1fr 1fr;gap:8px">{% for c in codes %}<div class="pill mono" style="justify-content:center;font-size:1.05rem">{{ c }}</div>{% endfor %}</div>
+  <p style="margin-top:16px"><a class="btn primary" href="{% url 'home' %}">OK</a></p>
+</div>
+{% endblock %}
