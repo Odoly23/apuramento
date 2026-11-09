@@ -1,0 +1,27 @@
+{% extends "base.html" %}{% load ui static %}
+{% block anon %}
+<div class="login-wrap">
+  <div class="login-card">
+    <div class="login-hero">
+      <div class="logo">A</div>
+      <h1>{% t 'app_name' %}</h1>
+      <p class="muted">{% t 'tagline' %}</p>
+    </div>
+    <div class="card">
+      {% if form.non_field_errors %}<div class="msg error">{{ form.non_field_errors.0 }}</div>{% endif %}
+      <form method="post" autocomplete="off">{% csrf_token %}
+        <div class="field"><label for="id_username">{% t 'username' %}</label>
+          <input name="username" id="id_username" required autofocus autocapitalize="none"></div>
+        <div class="field"><label for="id_password">{% t 'password' %}</label>
+          <input name="password" id="id_password" type="password" required></div>
+        <input type="hidden" name="next" value="{{ next }}">
+        <button class="btn primary" style="width:100%;justify-content:center" type="submit">🔐 {% t 'login' %}</button>
+      </form>
+      <p class="muted small" style="margin-top:14px">🛡️ {% t 'secure_note' %}</p>
+    </div>
+    <p class="lang" style="text-align:center;margin-top:14px">
+      {% for code, name in langs.items %}<a href="{% url 'set_language' code %}" class="{% if code == lang %}on{% endif %}">{{ name }}</a>{% endfor %}
+    </p>
+  </div>
+</div>
+{% endblock %}

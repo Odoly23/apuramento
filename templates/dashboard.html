@@ -1,0 +1,28 @@
+{% extends "base.html" %}{% load static ui %}
+{% block title %}{% t 'dashboard' %}{% endblock %}
+{% block topbar %}<h1>{% t 'results' %}</h1><span class="live">{% t 'live' %}</span><span class="muted small" id="updated"></span>{% endblock %}
+{% block content %}
+{% if not snap %}<div class="card">{% t 'no_data' %}</div>{% else %}
+<div class="grid g4" id="kpis"></div>
+<div class="grid g-main" style="margin-top:16px">
+  <div class="card"><h2>🗳️ {{ snap.election.name }}</h2><div class="res" id="results"></div></div>
+  <div class="grid">
+    <div class="card"><h2>🥧 {% t 'share' %}</h2><div class="donut-wrap"><div class="donut" id="donut"><div><span>{% t 'total_votes' %}<b id="donutTotal">0</b></span></div></div></div>
+      <div id="legend" class="small muted" style="display:flex;gap:10px;flex-wrap:wrap;justify-content:center"></div></div>
+    <div class="card"><h2>🧭 {% t 'status' %}</h2><div id="states" class="small"></div></div>
+  </div>
+</div>
+<div class="card" style="margin-top:16px"><h2>🗺️ {% t 'map_by_region' %}</h2><div class="tiles" id="tiles"></div></div>
+<div class="grid g2" style="margin-top:16px">
+  <div class="card"><h2>⚡ {% t 'activity' %}</h2><div class="feed" id="feed"></div></div>
+  <div class="card"><h2>⬇️ {% t 'export_csv' %}</h2>
+    <p class="muted small">CSV · {% t 'municipality' %} / {% t 'postu' %} / {% t 'suku' %}</p>
+    <a class="btn" href="{% url 'export_csv' 'municipality' %}?e={{ election.id }}">{% t 'municipality' %}</a>
+    <a class="btn" href="{% url 'export_csv' 'postu' %}?e={{ election.id }}">{% t 'postu' %}</a>
+    <a class="btn" href="{% url 'export_csv' 'suku' %}?e={{ election.id }}">{% t 'suku' %}</a></div>
+</div>
+{{ snap|json_script:"snap" }}
+{{ my_party|json_script:"myParty" }}
+{% endif %}
+{% endblock %}
+{% block scripts %}{% if snap %}<script src="{% static 'js/dashboard.js' %}" defer></script>{% endif %}{% endblock %}

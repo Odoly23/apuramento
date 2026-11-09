@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{% t 'report' %} {{ report.centre.code }}{% endblock %}
+{% block topbar %}<a class="btn ghost" href="javascript:history.back()">← {% t 'back' %}</a><h1>{% t 'report' %} · {{ report.centre.name }}</h1>{% endblock %}
+{% block content %}
+<div class="grid g2">
+  <div class="card">
+    <h2>🗳️ {{ report.election.name }}</h2>
+    <p class="muted small">{{ report.centre.code }} · {{ report.centre.suku.name }} · {{ report.centre.suku.postu.name }} · {{ report.centre.suku.postu.municipality.name }}</p>
+    <p>{% t 'submitted_by' %}: <b>{{ report.submitted_by.get_username }}</b> · v{{ report.version }} · {{ report.updated_at|date:"d/m/Y H:i" }}
+      <span class="badge {{ report.status|status_class }}">{% if report.status == 'pending' %}{% t 'pending' %}{% elif report.status == 'verified' %}{% t 'verified' %}{% else %}{% t 'rejected' %}{% endif %}</span></p>
+    <div class="tbl-wrap"><table>
+      {% for l in lines %}<tr><td><span class="chip" style="background:{{ l.contestant.color }}">#{{ l.contestant.ballot_number }}</span> {{ l.contestant.name }}</td><td class="num"><b>{{ l.votes|fmt }}</b></td></tr>{% endfor %}
+      <tr><td>{% t 'blank' %}</td><td class="num">{{ report.blank|fmt }}</td></tr>
+      <tr><td>{% t 'invalid' %}</td><td class="num">{{ report.invalid|fmt }}</td></tr>
+      <tr><td><b>{% t 'voters_voted' %}</b></td><td class="num"><b>{{ report.voted|fmt }}</b> / {{ report.centre.registered_voters|fmt }}</td></tr>
+    </table></div>
+    {% if report.notes %}<p class="small"><b>{% t 'notes' %}:</b> {{ report.notes }}</p>{% endif %}
+    {% if report.flags %}<p>{% for f in report.flags %}<span class="badge warn">⚠ {% if f == 'high_turnout' %}{% t 'flag_high_turnout' %}{% elif f == 'high_invalid' %}{% t 'flag_high_invalid' %}{% elif f == 'extreme_share' %}{% t 'flag_extreme_share' %}{% else %}{{ f }}{% endif %}</span> {% endfor %}</p>{% endif %}
+    {% if report.review_note %}<p class="small">{% t 'reason' %}: {{ report.review_note }}{% if report.reviewed_by %} — {{ report.reviewed_by.get_username }}{% endif %}</p>{% endif %}
+  </div>
+  <div class="card">
+    <h2>🔐 {% t 'integrity' %}</h2>
+    <p><span class="badge {% if integrity %}ok{% else %}bad{% endif %}">{% if integrity %}{% t 'integrity_ok' %}{% else %}{% t 'integrity_bad' %}{% endif %}</span></p>
+    <p class="hash mono muted">SHA-256: {{ report.content_hash }}</p>
+    <h2 style="margin-top:14px">📷 {% t 'evidence' %}</h2>
+    <div class="thumbs">{% for ev in report.evidence.all %}<a href="{% url 'evidence_file' ev.id %}" target="_blank" rel="noopener"><img src="{% url 'evidence_file' ev.id %}" alt="{% t 'evidence' %}" loading="lazy"></a>{% endfor %}</div>
+    {% for ev in report.evidence.all %}<div class="hash mono muted">#{{ forloop.counter }} {{ ev.sha256 }}</div>{% endfor %}
+    {% if profile.is_admin %}
+    <form method="post" action="{% url 'report_review' report.id %}" style="margin-top:16px">{% csrf_token %}
+      <div class="field"><label>{% t 'reason' %}</label><input name="note" maxlength="300"></div>
+      <button class="btn good" name="action" value="verify">✔ {% t 'verify' %}</button>
+      <button class="btn danger" name="action" value="reject">✖ {% t 'reject' %}</button>
+    </form>{% endif %}
+  </div>
+</div>
+{% if siblings %}
+<div class="card" style="margin-top:16px"><h2>👥 {% t 'queue_conflicts' %}</h2>
+  <div class="tbl-wrap"><table><tr><th>{% t 'user' %}</th><th class="num">{% t 'voters_voted' %}</th><th class="num">{% t 'blank' %}</th><th class="num">{% t 'invalid' %}</th><th>{% t 'status' %}</th><th></th></tr>
+  {% for s, same in siblings %}<tr><td>{{ s.submitted_by.get_username }}</td><td class="num">{{ s.voted|fmt }}</td><td class="num">{{ s.blank|fmt }}</td><td class="num">{{ s.invalid|fmt }}</td>
+    <td><span class="badge {% if same %}ok{% else %}bad{% endif %}">{% if same %}= {% t 'consensus' %}{% else %}≠ {% t 'conflict' %}{% endif %}</span> <span class="badge {{ s.status|status_class }}">{{ s.status }}</span></td>
+    <td><a href="{% url 'report_detail' s.id %}">{% t 'view' %}</a></td></tr>{% endfor %}
+  </table></div></div>{% endif %}
+{% if history %}<div class="card" style="margin-top:16px"><h2>🕑 {% t 'audit' %}</h2>
+  <div class="feed">{% for h in history %}<div><span class="mono small">{{ h.created|date:"d/m H:i:s" }}</span><b>{{ h.action }}</b><span class="muted">{{ h.username }}</span></div>{% endfor %}</div></div>{% endif %}
+{% endblock %}

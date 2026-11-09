@@ -1,0 +1,32 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{% t 'my_centres' %}{% endblock %}
+{% block topbar %}<h1>{% t 'my_centres' %}</h1>{% endblock %}
+{% block content %}
+{% if not election %}<div class="card">{% t 'no_data' %}</div>{% else %}
+<div class="card kpi" style="margin-bottom:16px">
+  <div class="label">{% t 'progress' %} · {{ election.name }}</div>
+  <div class="value">{{ done }} / {{ total }}</div>
+  <div class="bar"><i style="width:{{ pct }}%"></i></div>
+</div>
+{% if not rows %}<div class="card">{% t 'assigned_none' %}</div>{% endif %}
+<div class="grid g2">
+  {% for r in rows %}
+  <div class="card">
+    <div style="display:flex;gap:10px;align-items:flex-start">
+      <div style="flex:1"><h3>{{ r.centre.name }}</h3>
+        <div class="muted small">{{ r.centre.code }} · {{ r.centre.suku.name }} · {{ r.centre.suku.postu.name }} · {{ r.centre.suku.postu.municipality.name }}</div>
+        <div class="muted small">{% t 'registered' %}: <b>{{ r.centre.registered_voters|fmt }}</b></div></div>
+      {% if r.own %}<span class="badge {{ r.own.status|status_class }}">{% if r.own.status == 'pending' %}{% t 'pending' %}{% elif r.own.status == 'verified' %}{% t 'verified' %}{% else %}{% t 'rejected' %}{% endif %}</span>
+      {% else %}<span class="badge muted">{% t 'not_submitted' %}</span>{% endif %}
+    </div>
+    {% if r.state == 'conflict' %}<p class="badge bad" style="margin-top:10px">⚠ {% t 'flag_conflict' %}</p>{% endif %}
+    {% if r.own and r.own.status == 'rejected' and r.own.review_note %}<p class="small" style="color:var(--bad)">{% t 'reason' %}: {{ r.own.review_note }}</p>{% endif %}
+    <div style="margin-top:12px;display:flex;gap:8px">
+      <a class="btn primary" href="{% url 'submit_report' r.centre.id %}">{% if r.own %}{% t 'update_results' %}{% else %}{% t 'submit_results' %}{% endif %}</a>
+      {% if r.own %}<a class="btn" href="{% url 'report_detail' r.own.id %}">{% t 'view' %}</a>{% endif %}
+    </div>
+  </div>
+  {% endfor %}
+</div>
+{% endif %}
+{% endblock %}

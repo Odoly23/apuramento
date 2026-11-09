@@ -1,0 +1,74 @@
+{% load static ui %}<!doctype html>
+<html lang="{{ lang }}">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="robots" content="noindex,nofollow">
+  <title>{% block title %}{% t 'app_name' %}{% endblock %} · Timor-Leste</title>
+  <script src="{% static 'js/theme.js' %}"></script>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+{% if user.is_authenticated %}
+<div class="shell">
+  <aside class="side" id="side">
+    <div class="brand"><div class="logo">A</div><div>{% t 'app_name' %}<small>Timor-Leste · 🇹🇱</small></div></div>
+    <nav class="nav">
+      {% if profile.can_monitor %}
+        <a href="{% url 'dashboard' %}" class="{% if page == 'dashboard' %}active{% endif %}"><span class="ic">📊</span>{% t 'dashboard' %}</a>
+        <a href="{% url 'compare' %}" class="{% if page == 'compare' %}active{% endif %}"><span class="ic">⚖️</span>{% t 'compare' %}</a>
+      {% endif %}
+      {% if profile.is_fiskal %}
+        <a href="{% url 'fiskal_home' %}" class="{% if page == 'fiskal' %}active{% endif %}"><span class="ic">📝</span>{% t 'my_centres' %}</a>
+      {% endif %}
+      {% if profile.is_admin %}
+        <a href="{% url 'verification' %}" class="{% if page == 'verification' %}active{% endif %}"><span class="ic">✅</span>{% t 'verification' %}</a>
+        <a href="{% url 'audit' %}" class="{% if page == 'audit' %}active{% endif %}"><span class="ic">🔒</span>{% t 'audit' %}</a>
+      {% endif %}
+      {% if user.is_staff %}<a href="{% url 'admin:index' %}"><span class="ic">⚙️</span>Admin</a>{% endif %}
+    </nav>
+    <div class="side-foot">
+      <div><b>{{ user.get_username }}</b></div>
+      <div>{{ profile.get_role_display }}{% if profile.organization %} · {{ profile.organization }}{% endif %}</div>
+      <form method="post" action="{% url 'logout' %}" style="margin-top:8px">{% csrf_token %}
+        <button class="btn ghost" type="submit">⎋ {% t 'logout' %}</button></form>
+    </div>
+  </aside>
+  <main class="main">
+    <div class="topbar">
+      <button class="btn ghost menu-btn" id="menuBtn" aria-label="menu">☰</button>
+      {% block topbar %}{% endblock %}
+      <span class="right"></span>
+      {% if election %}
+      <form method="get" id="electionForm">
+        <select name="e" data-autosubmit aria-label="{% t 'election' %}">
+          {% for e in elections %}<option value="{{ e.id }}" {% if e.id == election.id %}selected{% endif %}>{{ e.name }}</option>{% endfor %}
+        </select>
+      </form>
+      {% endif %}
+      <span class="lang pill">{% for code, name in langs.items %}<a href="{% url 'set_language' code %}" class="{% if code == lang %}on{% endif %}" title="{{ name }}">{{ code|upper }}</a>{% endfor %}</span>
+      <button class="btn ghost" id="themeBtn" title="{% t 'theme' %}">🌓</button>
+    </div>
+    {% for m in messages %}<div class="msg {{ m.tags }}">{{ m }}</div>{% endfor %}
+    {% block content %}{% endblock %}
+  </main>
+</div>
+<button class="chat-fab" id="chatFab" aria-label="chat">💬</button>
+<section class="chat" id="chat" aria-label="{% t 'chat_title' %}">
+  <div class="chat-head"><span>🤖 {% t 'chat_title' %}</span><button id="chatClose" aria-label="close">✕</button></div>
+  <div class="chat-log" id="chatLog"></div>
+  <div class="chat-sugg" id="chatSugg"></div>
+  <form class="chat-form" id="chatForm">
+    <input id="chatInput" autocomplete="off" maxlength="300" placeholder="{% t 'chat_placeholder' %}">
+    <button class="btn primary" type="submit">{% t 'chat_send' %}</button>
+  </form>
+</section>
+{{ i18n_all|json_script:"i18n" }}
+<meta name="csrf" content="{{ csrf_token }}">
+<script src="{% static 'js/app.js' %}" defer></script>
+{% else %}
+{% block anon %}{% endblock %}
+{% endif %}
+{% block scripts %}{% endblock %}
+</body>
+</html>

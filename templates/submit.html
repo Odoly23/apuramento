@@ -1,0 +1,45 @@
+{% extends "base.html" %}{% load static ui %}
+{% block title %}{{ centre.name }}{% endblock %}
+{% block topbar %}<a class="btn ghost" href="{% url 'fiskal_home' %}">← {% t 'back' %}</a><h1>{{ centre.name }}</h1>{% endblock %}
+{% block content %}
+<div class="card" style="margin-bottom:16px">
+  <div class="muted">{{ centre.code }} · {{ centre.suku.name }} · {{ centre.suku.postu.name }} · {{ centre.suku.postu.municipality.name }}</div>
+  <div>{% t 'registered' %}: <b id="registered" data-n="{{ centre.registered_voters }}">{{ centre.registered_voters|fmt }}</b>
+    · {{ election.name }}</div>
+  {% if locked %}<div class="msg error" style="margin-top:10px">🔒 {% t 'err_locked' %}</div>{% endif %}
+  {% if report and report.status == 'rejected' %}<div class="msg error" style="margin-top:10px">{% t 'rejected' %}: {{ report.review_note }}</div>{% endif %}
+</div>
+<form method="post" enctype="multipart/form-data" id="reportForm" novalidate>{% csrf_token %}
+  <fieldset {% if locked %}disabled{% endif %} style="border:0;padding:0;margin:0">
+  <div class="card">
+    <h2>🗳️ {% t 'enter_votes' %}</h2>
+    {% for c, f in contestants %}
+    <div class="vote-row">
+      <div class="badge-n" style="background:{{ c.color }}">#{{ c.ballot_number }}</div>
+      <div><b>{{ c.name }}</b><div class="muted small">{{ c.short }}</div>{{ f.errors }}</div>
+      <input type="number" min="0" inputmode="numeric" name="{{ f.html_name }}" value="{{ f.value|default_if_none:0 }}" class="cvote">
+    </div>
+    {% endfor %}
+    <div class="vote-row"><div></div><div><b>{% t 'blank' %}</b>{{ form.blank.errors }}</div>
+      <input type="number" min="0" inputmode="numeric" name="blank" id="blank" value="{{ form.blank.value|default_if_none:0 }}" class="cvote"></div>
+    <div class="vote-row"><div></div><div><b>{% t 'invalid' %}</b>{{ form.invalid.errors }}</div>
+      <input type="number" min="0" inputmode="numeric" name="invalid" id="invalid" value="{{ form.invalid.value|default_if_none:0 }}" class="cvote"></div>
+    <div class="vote-row" style="border:0"><div></div><div><b>{% t 'voters_voted' %}</b>{{ form.voted.errors }}</div>
+      <input type="number" min="0" inputmode="numeric" name="voted" id="voted" value="{{ form.voted.value|default_if_none:'' }}"></div>
+  </div>
+  <div class="card" style="margin-top:16px">
+    <h2>📷 {% t 'photo_proof' %}</h2>
+    <p class="muted small">{% t 'photo_help' %}</p>
+    {{ form.photos }}{{ form.photos.errors }}
+    <div class="thumbs" id="preview"></div>
+    {% if report %}<div class="thumbs">{% for ev in report.evidence.all %}<a href="{% url 'evidence_file' ev.id %}" target="_blank" rel="noopener"><img src="{% url 'evidence_file' ev.id %}" alt="" loading="lazy"></a>{% endfor %}</div>{% endif %}
+    <div class="field" style="margin-top:14px"><label>{% t 'notes' %}</label>{{ form.notes }}</div>
+  </div>
+  <div class="sumbox" id="sumbox" style="margin-top:16px">
+    <span>{% t 'sum_check' %}:</span><span id="sumtxt">—</span><span class="muted small right">Σ <b id="sumval">0</b> / <b id="votedval">0</b></span>
+    <button class="btn primary" type="submit" {% if locked %}disabled{% endif %}>✅ {% t 'submit' %}</button>
+  </div>
+  </fieldset>
+</form>
+{% endblock %}
+{% block scripts %}<script src="{% static 'js/submit.js' %}" defer></script>{% endblock %}

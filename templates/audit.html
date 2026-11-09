@@ -1,0 +1,11 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{% t 'audit' %}{% endblock %}
+{% block topbar %}<h1>{% t 'audit' %}</h1>{% endblock %}
+{% block content %}
+<div class="card" style="margin-bottom:16px"><h2>🔗 {% t 'chain_status' %}</h2>
+  {% if chain_ok %}<span class="badge ok">✔ {{ n }} · {% t 'integrity_ok' %}</span>{% else %}<span class="badge bad">✖ #{{ bad_id }} · {% t 'integrity_bad' %}</span>{% endif %}</div>
+<div class="card"><div class="tbl-wrap"><table>
+  <tr><th>#</th><th>{% t 'time' %}</th><th>{% t 'user' %}</th><th>{% t 'action' %}</th><th>{% t 'target' %}</th><th>IP</th><th>Hash</th></tr>
+  {% for l in logs %}<tr><td>{{ l.id }}</td><td>{{ l.created|date:"d/m/Y H:i:s" }}</td><td>{{ l.username }}</td><td>{{ l.action }}</td><td>{{ l.target }}</td><td>{{ l.ip|default:"" }}</td><td class="mono small">{{ l.hash|slice:":12" }}…</td></tr>{% endfor %}
+</table></div></div>
+{% endblock %}

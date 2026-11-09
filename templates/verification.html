@@ -1,0 +1,18 @@
+{% extends "base.html" %}{% load ui %}
+{% block title %}{% t 'verification' %}{% endblock %}
+{% block topbar %}<h1>{% t 'queue' %}</h1>{% endblock %}
+{% block content %}
+<div class="card" style="margin-bottom:16px"><h2>⚠️ {% t 'queue_conflicts' %} <span class="badge {% if conflicts %}bad{% else %}ok{% endif %}">{{ conflicts|length }}</span></h2>
+  {% for c in conflicts %}
+  <div style="padding:10px 0;border-top:1px solid var(--line)"><b>{{ c.centre.name }}</b> <span class="muted small">{{ c.centre.code }}</span>
+    <div class="small">{% for r in c.reports %}<a href="{% url 'report_detail' r.id %}">{{ r.submitted_by.get_username }} ({{ r.voted|fmt }})</a>{% if not forloop.last %} · {% endif %}{% endfor %}</div></div>
+  {% empty %}<p class="muted">{% t 'no_data' %}</p>{% endfor %}
+</div>
+<div class="grid g2">
+  <div class="card"><h2>🚩 {% t 'queue_flagged' %} <span class="badge warn">{{ flagged|length }}</span></h2>
+    <div class="feed">{% for r in flagged %}<div><a href="{% url 'report_detail' r.id %}"><b>{{ r.centre.name }}</b></a><span class="muted small">{{ r.submitted_by.get_username }}</span>
+      {% for f in r.flags %}<span class="badge warn">{{ f }}</span>{% endfor %}</div>{% empty %}<span class="muted">{% t 'no_data' %}</span>{% endfor %}</div></div>
+  <div class="card"><h2>⏳ {% t 'queue_pending' %} <span class="badge muted">{{ pending|length }}</span></h2>
+    <div class="feed">{% for r in pending %}<div><a href="{% url 'report_detail' r.id %}"><b>{{ r.centre.name }}</b></a><span class="muted small">{{ r.submitted_by.get_username }} · {{ r.voted|fmt }}</span></div>{% empty %}<span class="muted">{% t 'no_data' %}</span>{% endfor %}</div></div>
+</div>
+{% endblock %}
